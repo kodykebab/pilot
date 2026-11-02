@@ -51,6 +51,7 @@ def test_files_from_another_site_land_in_this_site(tmp_path: Path) -> None:
 
     assert (site.path / "public" / "files" / "logo.png").read_text() == "image"
     site.restore.assert_not_called()  # files only: the database is left alone
+    site.suspend_passport.assert_not_called()
     site.migrate.assert_called_once()
     assert site.set_maintenance_mode.call_args_list[-1].args == (False,)
 
@@ -118,6 +119,11 @@ def _source_config(tmp_path: Path) -> Path:
         "redis_cache": "redis://source",
         "host_name": "https://source.example.com",
         "pilot_auth_token": "source-token",
+        "passport_private_key": "source-passport-key",
+        "passport_client_id": "source-client",
+        "passport_disabled": False,
+        "passport_installation": "source-installation",
+        "passport_issuer": "https://id.example.invalid",
         "maintenance_mode": 1,
         "email_sender_name": "Source",
         "domains": ["shop.source.example.com"],
@@ -189,6 +195,27 @@ def test_a_missing_part_is_refused_before_anything_changes(tmp_path: Path) -> No
         SiteRestore(site).restore(BackupRun(), ["private"], lambda message: None)
 
     site.set_maintenance_mode.assert_not_called()
+    site.suspend_passport.assert_not_called()
+
+
+@pytest.mark.parametrize("part", ["database", "config"])
+def test_passport_is_suspended_before_replacing_state(tmp_path: Path, part: str) -> None:
+    site = _site(tmp_path)
+    restore = SiteRestore(site)
+    run = BackupRun(files={part: tmp_path / "backup"})
+
+    def fail_replacement(*args):
+        site.suspend_passport.assert_called_once_with()
+        raise RuntimeError("replacement failed")
+
+    with (
+        patch.object(restore, "restore_parts", side_effect=fail_replacement),
+        pytest.raises(RuntimeError, match="replacement failed"),
+    ):
+        restore.restore(run, [part], lambda message: None)
+
+    site.migrate.assert_not_called()
+    assert site.set_maintenance_mode.call_args_list[-1].args == (True,)
 
 
 def test_a_dump_streams_into_the_client(tmp_path: Path, monkeypatch) -> None:

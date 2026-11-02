@@ -154,6 +154,27 @@ class Site:
 
         set_site_config_values(self.bench.sites_path, self.config.name, values)
 
+    def suspend_passport(self) -> None:
+        """Require re-enrollment and reject restored Passport sessions."""
+        from pilot.core.site.config import suspend_passport
+
+        suspend_passport(self.bench.sites_path, self.config.name)
+
+    def prepare_passport_enrollment(self, issuer: str, client_id: str) -> dict:
+        from pilot.core.site.passport import SiteEnrollment
+
+        return SiteEnrollment(self).prepare(issuer, client_id)
+
+    def confirm_passport_enrollment(self, reviewed: dict[str, str], approved: list[str]) -> str:
+        from pilot.core.site.passport import SiteEnrollment
+
+        return SiteEnrollment(self).confirm(reviewed, approved)
+
+    def review_passport_enrollment(self) -> dict:
+        from pilot.core.site.passport import SiteEnrollment
+
+        return SiteEnrollment(self).review()
+
     def reinstall(self, admin_password: str) -> None:
         from pilot.core.site.commands import SiteCommands
 

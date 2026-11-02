@@ -53,12 +53,14 @@ class SiteCommands:
             cmd += ["--with-public-files", public_files]
         if private_files:
             cmd += ["--with-private-files", private_files]
+        self.site.suspend_passport()
         with self.setup_credentials(self.site.db_type) as credentials:
             run_command(cmd + credentials, cwd=self.site.bench.sites_path, stream_output=True)
 
     def reinstall(self, admin_password: str) -> None:
         if not isinstance(admin_password, str) or not admin_password.strip():
             raise BenchError("Site Administrator password must not be empty.")
+        self.site.suspend_passport()
         cmd = self.site._frappe_call(
             "frappe",
             "--site",

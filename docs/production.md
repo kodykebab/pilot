@@ -1,5 +1,35 @@
 # Production
 
+## Passport restore boundary
+
+Pilot excludes all `passport_` keys from imported backup configuration. Before database restore, configuration restore or reinstall, a destination with Passport configuration is suspended with `passport_disabled` and a new `passport_installation` marker. Repeated attempts preserve an existing suspension marker. A restore failure does not enable Passport again. Sites without Passport configuration and file-only restores keep their current configuration.
+
+The Passport client enforces the installation marker against both sessions and the database admission policy. Restoring a database does not enroll the destination with the identity issuer. A pending enrollment is invalidated by another restore or suspension.
+
+Use these commands in the destination bench after installing the Passport client. Use HTTPS origins in production. The site must have its destination `host_name` configured before preparation.
+
+```sh
+umask 077
+pilot passport-prepare site.example https://id.example site-client-id > enrollment.json
+pilot passport-review site.example > admission-review.json
+```
+
+Preparation creates a private signing key in the destination site configuration and leaves Passport suspended. Send only `enrollment.json` to the Passport administrator. The administrator must verify the destination and approve the public request through `passport.setup.approve_enrollment(request, title)` in the issuer's native administrator console. Pilot does not hold an issuer administrator credential. Repeating preparation returns the same pending public request.
+
+Review every association in `admission-review.json`. Add the identity names that may enter this site's application to its `approved` list. Leave the `reviewed` epochs unchanged. The default approves no identities. Cloud team membership does not grant application admission.
+
+```sh
+pilot passport-confirm site.example admission-review.json
+```
+
+Confirmation verifies a fresh signed issuer approval, applies the reviewed selection, and enables only that installation. An outdated review or concurrent configuration change leaves Passport suspended. Export a new review if associations changed. Keep review files private because they contain account identifiers. Native user roles remain the application's authority for permissions.
+
+The generic site-configuration API hides and rejects changes to `passport_disabled`, `passport_installation` and `passport_enrollment`. Use the enrollment commands to change these fields.
+
+Before enabling Passport invitations, apply the proxy-log access and retention requirements in Passport's deployment runbook. Nginx error logs can contain invitation query secrets. This includes Pilot log downloads and Fluent Bit destinations. Log directories inherit filesystem permissions; Pilot does not automatically configure private access or retention. Deployment approval must verify these controls.
+
+Before ownership transfer, run `pilot passport-suspend site.example`, then prepare a new key, obtain issuer approval, and review local admission for the new owner. Use a distinct client ID and destination origin for a clone so its approval cannot replace the source registration. Database/configuration restore and reinstall suspend automatically; a transfer performed outside these Pilot operations must explicitly suspend first. Do not clear `passport_disabled` by hand or import a source site's signing key.
+
 Production mode turns a bench into managed services behind nginx. It is meant for Linux hosts with system privileges available to the current user.
 
 ## Config

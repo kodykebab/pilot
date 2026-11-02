@@ -68,6 +68,10 @@ Settings shared by every bench under one benches directory - `[mariadb]`, `[post
 
 Sites are represented by site directories and bench config records where needed.
 
+Passport configuration is site-local and excluded from imported backup configuration. Database restore, configuration restore and reinstall suspend an existing Passport configuration before replacing state. The suspension and installation marker remain after failure. File-only restore leaves Passport configuration unchanged. See [Production](docs/production.md#passport-restore-boundary).
+
+Passport enrollment is owned by `Site`: prepare a destination key and public request, export local identity admission for review, then confirm a signed issuer administrator approval before activation. Configuration changes invalidate an in-flight confirmation. Ownership transfer explicitly suspends first. Pilot holds no issuer administrator credential and does not map infrastructure teams to application permissions.
+
 ## Task Model
 
 Long operations should be `Task` subclasses. Queue them with `SomeTask.queue(bench, ...)` or `SomeTask.queue_submission(bench, ...)`.

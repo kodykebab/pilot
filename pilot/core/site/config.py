@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import re
+import secrets
 from collections.abc import Callable
 from pathlib import Path
 
@@ -31,6 +32,9 @@ PROTECTED_CONFIG_KEYS = frozenset(
         "domains",
         "host_name",
         "installed_apps",
+        "passport_disabled",
+        "passport_enrollment",
+        "passport_installation",
         "pilot_auth_token",
         "pilot_endpoint",
         "route",
@@ -230,6 +234,23 @@ def clear_certificate_pin(sites_root: Path, site_name: str) -> None:
         config = json.loads(config_path.read_text())
         if config.pop("cert_name", None) is None:
             return
+        replace_private_text_locked(config_path, json.dumps(config, indent=1))
+
+
+def suspend_passport(sites_root: Path, site_name: str) -> None:
+    config_path = safe_site_config_path(sites_root, site_name)
+    with exclusive_file_lock(config_path):
+        config = json.loads(config_path.read_text())
+        if not any(key.startswith("passport_") for key in config):
+            return
+        if (
+            config.get("passport_disabled")
+            and config.get("passport_installation")
+            and not config.get("passport_enrollment")
+        ):
+            return
+        config.pop("passport_enrollment", None)
+        config.update(passport_disabled=True, passport_installation=secrets.token_hex(16))
         replace_private_text_locked(config_path, json.dumps(config, indent=1))
 
 
